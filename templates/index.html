@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Numerical System</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background: #f0f2f5; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        input, button { padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
+        button { background: #1a73e8; color: white; cursor: pointer; border: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>数值分析可视化平台 (Newton Method)</h2>
+        输入方程 (如 sin(x) 或 x**2 - 2): <input type="text" id="expr" value="sin(x)">
+        初值 x0: <input type="number" id="x0" value="2" step="0.1">
+        <button onclick="run()">启动算法演示</button>
+    </div>
+
+    <div class="grid">
+        <div class="card"><div id="mainPlot"></div></div>
+        <div class="card"><div id="errorPlot"></div></div>
+    </div>
+
+    <script>
+        async function run() {
+            const res = await fetch('/calculate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    expression: document.getElementById('expr').value,
+                    x0: document.getElementById('x0').value
+                })
+            });
+            const data = await res.json();
+            if(!data.success) { alert("Error: " + data.error); return; }
+
+            // 1. 初始化背景线
+            const curve = { x: data.curve.x, y: data.curve.y, mode: 'lines', name: 'f(x)', line: {color: '#ccc'} };
+            Plotly.newPlot('mainPlot', [curve], {title: '收敛过程展示', xaxis: {autorange: true}, yaxis: {autorange: true}});
+            Plotly.newPlot('errorPlot', [], {title: '误差下降趋势', yaxis: {type: 'log', title: 'Absolute Error'}});
+
+            // 2. 动画演示迭代
+            let x_steps = [], y_steps = [], errs = [];
+            for(let i=0; i < data.steps.length; i++) {
+                await new Promise(r => setTimeout(r, 600)); // 0.6秒步进
+
+                x_steps.push(data.steps[i].x);
+                y_steps.push(data.steps[i].y);
+                if(i > 0) errs.push(data.errors[i-1]);
+
+                Plotly.react('mainPlot', [
+                    curve,
+                    { x: x_steps, y: y_steps, mode: 'markers+lines', name: 'Iteration', marker: {color: 'red', size: 8} }
+                ]);
+                Plotly.react('errorPlot', [{ y: errs, mode: 'lines+markers', name: 'Error' }]);
+            }
+        }
+    </script>
+</body>
+</html>
